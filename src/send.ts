@@ -18,7 +18,7 @@ const iexec = new IExec(
 );
 
 // 2. Infos
-export async function handleSend(){
+export async function handleSend(amount: string, receiver: string) {
   // 3. Récupérer les ordres App
   const { orders: appOrders } = await iexec.orderbook.fetchAppOrderbook(APP_ADDRESS, {
     minTag: ['tee', 'scone'],
@@ -44,9 +44,9 @@ export async function handleSend(){
   // 5. Push RequesterSecret - FIXED
   const requesterSecrets = [
     { key: '1', value: process.env.PRIVATEKEY_SENDER! },
-    { key: '2', value: process.env.AMOUNT! },
+    { key: '2', value: amount },
     { key: '3', value: process.env.RPC! },
-    { key: '4', value: process.env.RECEIVER! }
+    { key: '4', value: receiver },
   ];
 
   let iexec_secrets;

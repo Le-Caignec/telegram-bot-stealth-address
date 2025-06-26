@@ -20,35 +20,13 @@ bot.onText(/\/start/, (msg) => {
 });
 
 // Commande /send ➜ exécute test.ts directement
-bot.onText(/\/send/, async (msg) => {
+bot.onText(/\/send/, (msg) => {
   const chatId = msg.chat.id;
-  bot.sendMessage(chatId, '🚀 Lancement de la tâche...');
-
-  try {
-    const { txHash, taskId, waitForCompletion } = await handleSend();
-
-    await bot.sendMessage(
-      chatId,
-      `✅ Deal créé !\n🧾 txHash: [${txHash}](https://explorer.iex.ec/bellecour/tx/${txHash})\n📦 taskId: [${taskId}](https://explorer.iex.ec/bellecour/task/${taskId})`,
-      { parse_mode: 'Markdown' }
-    );
-
-    await waitForCompletion();
-
-    await bot.sendMessage(chatId, `✅ La tâche est maintenant *terminée* !`, {
-      parse_mode: 'Markdown',
-    });
-  } catch (error) {
-    console.error('Erreur dans send():', error);
-    bot.sendMessage(chatId, `❌ Erreur : ${String(error)}`);
-  }
+  userStates.set(chatId, { step: 'amount' });
+  bot.sendMessage(chatId, '💰 Quel est le montant à envoyer ?');
 });
 
-
-
-
-// Gestion des messages utilisateur pour /start
-bot.on('message', (msg) => {
+bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text?.trim();
   const state = userStates.get(chatId);
@@ -56,28 +34,36 @@ bot.on('message', (msg) => {
   // Ignore les commandes
   if (!state || text?.startsWith('/')) return;
 
-  if (state.step === 'wallet') {
-    state.wallet = text;
-    state.step = 'amount';
-    bot.sendMessage(chatId, '✅ Reçu. Quel est le montant ?');
-  } else if (state.step === 'amount') {
+  if (state.step === 'amount') {
     state.amount = text;
-    state.step = 'chain';
-    bot.sendMessage(chatId, '🧠 Merci. Quel est le Chain ID ?');
-  } else if (state.step === 'chain') {
-    state.chainId = text;
-    userStates.delete(chatId);
+    state.step = 'receiver';
+    bot.sendMessage(chatId, '🏦 Quelle est l’adresse du wallet destinataire ?');
+  } else if (state.step === 'receiver') {
+    state.receiver = text;
+    userStates.delete(chatId); // Nettoyage
 
-    const input = {
-      wallet: state.wallet,
-      amount: state.amount,
-      chainId: state.chainId,
-    };
+    const { amount, receiver } = state;
 
-    const inputPath = path.resolve(__dirname, 'bot-input.json');
-    fs.writeFileSync(inputPath, JSON.stringify(input, null, 2));
+    try {
+      bot.sendMessage(chatId, '🚀 Lancement de la tâche...');
 
-    bot.sendMessage(chatId, '🎉 Merci ! Données enregistrées.');
+      const { txHash, taskId, waitForCompletion } = await handleSend(amount, receiver);
+
+      await bot.sendMessage(
+        chatId,
+        `✅ Deal créé !\n🧾 txHash: [${txHash}](https://explorer.iex.ec/bellecour/tx/${txHash})\n📦 taskId: [${taskId}](https://explorer.iex.ec/bellecour/task/${taskId})`,
+        { parse_mode: 'Markdown' }
+      );
+
+      await waitForCompletion();
+
+      await bot.sendMessage(chatId, `✅ La tâche est maintenant *terminée* !`, {
+        parse_mode: 'Markdown',
+      });
+    } catch (error) {
+      console.error('Erreur dans send():', error);
+      bot.sendMessage(chatId, `❌ Erreur : ${String(error)}`);
+    }
   }
 });
-
+ 
