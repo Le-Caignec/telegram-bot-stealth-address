@@ -1,30 +1,25 @@
 import { IExec, utils } from 'iexec';
 import { ethers } from 'ethers';
 import {WORKERPOOL_ADDRESS,APP_ADDRESS} from './config/config'
+import {pushRequesterSecret} from './utils/utils';
 
-// 1. Créer un wallet temporaire
-//const privateKey = ethers.Wallet.createRandom().privateKey;
-const privateKey = process.env.WALLET_PRIVATE_KEY;
-// 2. Initialiser iExec
+// 1. Initialiser iExec
 const ethProvider = utils.getSignerFromPrivateKey(
   'bellecour', // blockchain node URL
   ethers.Wallet.createRandom().privateKey,
 );
-const iexec = new IExec({
-  ethProvider,
-},
-{
-  smsURL: 'https://sms.labs.iex.ec',
-}
+const iexec = new IExec(
+  {
+    ethProvider,
+  },
+  {
+    smsURL: "https://sms.labs.iex.ec",
+  }
 );
 
-// 3. Infos
-export async function handleSend(): Promise<{
-  txHash: string;
-  taskId: string;
-  waitForCompletion: () => Promise<void>;
-}> {
-  // 1. Récupérer les ordres App
+// 2. Infos
+export async function handleSend(){
+  // 3. Récupérer les ordres App
   const { orders: appOrders } = await iexec.orderbook.fetchAppOrderbook(APP_ADDRESS, {
     minTag: ['tee', 'scone'],
     maxTag: ['tee', 'scone'],
@@ -32,8 +27,9 @@ export async function handleSend(): Promise<{
   });
   if (appOrders.length === 0) throw new Error('❌ Aucun AppOrder trouvé');
   const apporder = appOrders[0].order;
+  console.log("🚀 ~ handleSend ~ apporder:", apporder)
 
-  // 2. Récupérer les ordres Workerpool
+  // 4. Récupérer les ordres Workerpool
   const { orders: wpOrders } = await iexec.orderbook.fetchWorkerpoolOrderbook({
     workerpool: WORKERPOOL_ADDRESS,
     app: APP_ADDRESS,
@@ -43,25 +39,40 @@ export async function handleSend(): Promise<{
   });
   if (wpOrders.length === 0) throw new Error('❌ Aucun WorkerpoolOrder trouvé');
   const workerpoolorder = wpOrders[0].order;
+  console.log("🚀 ~ handleSend ~ workerpoolorder:", workerpoolorder)
 
-  // 3. Créer un RequestOrder
+  // 5. Push RequesterSecret - FIXED
+  const requesterSecrets = [
+    { key: '1', value: process.env.PRIVATEKEY_SENDER! },
+    { key: '2', value: process.env.AMOUNT! },
+    { key: '3', value: process.env.RPC! },
+    { key: '4', value: process.env.RECEIVER! }
+  ];
+
+  let iexec_secrets;
+  iexec_secrets = Object.fromEntries(
+    await Promise.all(
+      requesterSecrets.map(async ({ key, value }) => {
+        const name = await pushRequesterSecret({ iexec, value });
+        return [key, name];
+      })
+    )
+  );
+
+  // 6. Créer un RequestOrder
   const requestorderToSign = await iexec.order.createRequestorder({
     app: apporder.app,
     category: workerpoolorder.category,
     tag: ['tee', 'scone'],
     workerpool: workerpoolorder.workerpool,
     params:{
-      iexec_secrets:{
-        1:process.env.PRIVATEKEY_SENDER,
-        2:process.env.AMOUNT,
-        3:process.env.RPC,
-        4:process.env.RECEIVER
-      }
+      iexec_secrets
     }
   });
   const requestorder = await iexec.order.signRequestorder(requestorderToSign);
+  console.log("🚀 ~ handleSend ~ order:", requestorder)
 
-  // 4. Matcher les ordres
+  // 7. Matcher les ordres
   const { dealid, txHash } = await iexec.order.matchOrders({
     apporder,
     workerpoolorder,
@@ -69,11 +80,11 @@ export async function handleSend(): Promise<{
   });
   console.log('✅ Deal créé ! txHash:', txHash);
 
-  // 5. Calculer le taskId
+  // 8. Calculer le taskId
   const taskId = await iexec.deal.computeTaskId(dealid, 0);
   console.log('📦 taskId:', taskId);
 
-  // 6. Fonction à appeler plus tard pour attendre la complétion
+  // 9. Fonction à appeler plus tard pour attendre la complétion
   const waitForCompletion = async () => {
     const taskObservable = await iexec.task.obsTask(taskId, { dealid });
     await new Promise((resolve, reject) => {
