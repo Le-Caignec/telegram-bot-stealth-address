@@ -1,7 +1,8 @@
 {
   "name": "telegram-bot",
   "version": "1.0.0",
-  "main": "index.js",
+  "type": "module",
+  "main": "./src/bot.js",
   "scripts": {
     "test": "tsx ./src/test.ts",
     "build": "rimraf ./dist && tsc"

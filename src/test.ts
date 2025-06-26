@@ -1,12 +1,17 @@
-import { IExec } from 'iexec';
+import { IExec, utils } from 'iexec';
 import { ethers } from 'ethers';
 
 // 1. Créer un wallet temporaire
 const privateKey = ethers.Wallet.createRandom().privateKey;
-const ethProvider = new ethers.Wallet(privateKey); // ou utiliser un provider réel
 
 // 2. Initialiser iExec
-const iexec = new IExec({ ethProvider });
+const ethProvider = utils.getSignerFromPrivateKey(
+  'bellecour', // blockchain node URL
+  privateKey,
+);
+const iexec = new IExec({
+  ethProvider,
+});
 
 // 3. Infos
 const App = '0xa36e982af4adbac4c9a7305ae5b3c133cfd64b21';
