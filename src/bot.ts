@@ -1,3 +1,4 @@
+import 'dotenv/config'
 import TelegramBot from 'node-telegram-bot-api';
 import { exec } from 'child_process';
 import path from 'path';
