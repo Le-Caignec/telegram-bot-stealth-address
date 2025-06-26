@@ -22,22 +22,28 @@ bot.onText(/\/start/, (msg) => {
 // Commande /send ➜ exécute test.ts directement
 bot.onText(/\/send/, async (msg) => {
   const chatId = msg.chat.id;
-  bot.sendMessage(chatId, '🚀 Exécution en cours...');
+  bot.sendMessage(chatId, '🚀 Lancement de la tâche...');
 
   try {
-    const { txHash, taskId } = await handleSend();
+    const { txHash, taskId, waitForCompletion } = await handleSend();
 
-    const txUrl = `https://explorer.iex.ec/bellecour/tx/${txHash}`;
-    const taskUrl = `https://explorer.iex.ec/bellecour/task/${taskId}`;
+    await bot.sendMessage(
+      chatId,
+      `✅ Deal créé !\n🧾 txHash: [${txHash}](https://explorer.iex.ec/bellecour/tx/${txHash})\n📦 taskId: [${taskId}](https://explorer.iex.ec/bellecour/task/${taskId})`,
+      { parse_mode: 'Markdown' }
+    );
 
-    const message = `✅ Deal créé !\n🔗 [Voir le deal](${txUrl})\n📦 [Voir le task](${taskUrl})`;
+    await waitForCompletion();
 
-    bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+    await bot.sendMessage(chatId, `✅ La tâche est maintenant *terminée* !`, {
+      parse_mode: 'Markdown',
+    });
   } catch (error) {
-    console.error('Erreur dans handleSend():', error);
+    console.error('Erreur dans send():', error);
     bot.sendMessage(chatId, `❌ Erreur : ${String(error)}`);
   }
 });
+
 
 
 
