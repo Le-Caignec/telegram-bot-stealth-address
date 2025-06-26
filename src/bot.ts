@@ -12,9 +12,20 @@ const userStates = new Map<number, any>();
 // Commande /start ➜ questionnaire
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
-  userStates.set(chatId, { step: 'wallet' });
-  bot.sendMessage(chatId, '👋 Bienvenue ! Envoie ton adresse de wallet :');
+
+  const introMessage = `
+👋 *Bienvenue sur SKULD !*
+
+SKULD est une application d’investissement décentralisée basée sur les technologies iExec et Ethereum.  
+Elle vous permet d’envoyer des fonds avec une *stealth address* afin de garantir votre confidentialité et votre sécurité.
+
+Pour commencer, utilisez la commande */send*.
+  `;
+
+  bot.sendMessage(chatId, introMessage, { parse_mode: 'Markdown' });
 });
+
+
 
 // Commande /send ➜ exécute test.ts directement
 bot.onText(/\/send/, (msg) => {
