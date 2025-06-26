@@ -19,6 +19,14 @@ const iexec = new IExec(
 
 // 2. Infos
 export async function handleSend(amount: string, receiver: string) {
+  //check if amount is a valid number
+  if (isNaN(Number(amount))) {
+    throw new Error('❌ Le montant doit être un nombre valide');
+  }
+  //check if receiver is a valid address
+  if (!ethers.isAddress(receiver)) {
+    throw new Error('❌ L’adresse du destinataire n’est pas valide');
+  }
   // 3. Récupérer les ordres App
   const { orders: appOrders } = await iexec.orderbook.fetchAppOrderbook(APP_ADDRESS, {
     minTag: ['tee', 'scone'],
