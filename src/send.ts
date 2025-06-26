@@ -1,9 +1,10 @@
 import { IExec, utils } from 'iexec';
 import { ethers } from 'ethers';
+import {WORKERPOOL_ADDRESS,APP_ADDRESS} from './config/config'
 
 // 1. Créer un wallet temporaire
-const privateKey = ethers.Wallet.createRandom().privateKey;
-
+//const privateKey = ethers.Wallet.createRandom().privateKey;
+const privateKey = process.env.WALLET_PRIVATE_KEY;
 // 2. Initialiser iExec
 const ethProvider = utils.getSignerFromPrivateKey(
   'bellecour', // blockchain node URL
@@ -14,15 +15,12 @@ const iexec = new IExec({
 });
 
 // 3. Infos
-const App = '0xa36e982af4adbac4c9a7305ae5b3c133cfd64b21';
-const Workerpool = 'prod-v8-learn.main.pools.iexec.eth';
-
-async function main() {
+export async function handleSend() {
   // 4. Récupérer les ordres App
-  const { orders: appOrders } = await iexec.orderbook.fetchAppOrderbook(App, {
+  const { orders: appOrders } = await iexec.orderbook.fetchAppOrderbook(APP_ADDRESS, {
     minTag: ['tee', 'scone'],
     maxTag: ['tee', 'scone'],
-    workerpool: Workerpool,
+    workerpool: WORKERPOOL_ADDRESS,
   });
 
   if (appOrders.length === 0) throw new Error('❌ Aucun AppOrder trouvé');
@@ -30,8 +28,8 @@ async function main() {
 
   // 5. Récupérer les ordres Workerpool
   const { orders: wpOrders } = await iexec.orderbook.fetchWorkerpoolOrderbook({
-    workerpool: Workerpool,
-    app: App,
+    workerpool: WORKERPOOL_ADDRESS,
+    app: APP_ADDRESS,
     minTag: ['tee', 'scone'],
     maxTag: ['tee', 'scone'],
     category: 0,
@@ -63,5 +61,3 @@ async function main() {
   const taskId = await iexec.deal.computeTaskId(dealid, 0);
   console.log('📦 taskId:', taskId);
 }
-
-main().catch(console.error);

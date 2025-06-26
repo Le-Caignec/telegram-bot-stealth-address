@@ -1,56 +1,69 @@
-import TelegramBot, { Message } from 'node-telegram-bot-api';
+import TelegramBot from 'node-telegram-bot-api';
+import { exec } from 'child_process';
+import path from 'path';
+import fs from 'fs';
+import { handleSend } from './send';
 
-// Remplace avec ton token
-const token = '7241138521:AAH3drvlj-SMk8abgkP1hSmvGQ0gdXakobE';
+// Ton token
+const token = process.env.BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: true });
 
-// On stocke l'état des utilisateurs en mémoire (simple)
-interface UserState {
-  step: 'wallet' | 'amount' | 'chainId';
-  wallet?: string;
-  amount?: string;
-  chainId?: string;
-}
-const userStates = new Map<number, UserState>();
+// Pour suivre l’état des users
+const userStates = new Map<number, any>();
 
-// Commande /start
-bot.onText(/\/start/, (msg: Message) => {
+// Commande /start ➜ questionnaire
+bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
   userStates.set(chatId, { step: 'wallet' });
-  bot.sendMessage(chatId, "Bienvenue ! Quel est ton wallet address ?");
+  bot.sendMessage(chatId, '👋 Bienvenue ! Envoie ton adresse de wallet :');
 });
 
-// Réponse aux messages
-bot.on('message', (msg: Message) => {
+// Commande /send ➜ exécute test.ts directement
+bot.onText(/\/send/, async (msg) => {
   const chatId = msg.chat.id;
-  const text = msg.text;
+  bot.sendMessage(chatId, '🚀 Appel de la fonction `send()` dans test.ts...');
 
-  // On ignore le /start ici (déjà géré)
-  if (text?.startsWith('/start')) return;
+  try {
+    await handleSend(); // Appel de ta fonction asynchrone
+    bot.sendMessage(chatId, '✅ Fonction exécutée avec succès.');
+  } catch (error) {
+    console.error('Erreur dans send():', error);
+    bot.sendMessage(chatId, `❌ Erreur : ${String(error)}`);
+  }
+});
 
+
+// Gestion des messages utilisateur pour /start
+bot.on('message', (msg) => {
+  const chatId = msg.chat.id;
+  const text = msg.text?.trim();
   const state = userStates.get(chatId);
 
-  if (!state) {
-    bot.sendMessage(chatId, "Envoie /start pour commencer.");
-    return;
-  }
+  // Ignore les commandes
+  if (!state || text?.startsWith('/')) return;
 
   if (state.step === 'wallet') {
     state.wallet = text;
     state.step = 'amount';
-    bot.sendMessage(chatId, "Merci. Quel montant veux-tu envoyer ?");
+    bot.sendMessage(chatId, '✅ Reçu. Quel est le montant ?');
   } else if (state.step === 'amount') {
     state.amount = text;
-    state.step = 'chainId';
-    bot.sendMessage(chatId, "Parfait. Quelle est la chain ID ?");
-  } else if (state.step === 'chainId') {
+    state.step = 'chain';
+    bot.sendMessage(chatId, '🧠 Merci. Quel est le Chain ID ?');
+  } else if (state.step === 'chain') {
     state.chainId = text;
+    userStates.delete(chatId);
 
-    bot.sendMessage(
-      chatId,
-      `✅ Récapitulatif :\n\nWallet: ${state.wallet}\nMontant: ${state.amount}\nChain ID: ${state.chainId}`
-    );
+    const input = {
+      wallet: state.wallet,
+      amount: state.amount,
+      chainId: state.chainId,
+    };
 
-    userStates.delete(chatId); // Reset après fin
+    const inputPath = path.resolve(__dirname, 'bot-input.json');
+    fs.writeFileSync(inputPath, JSON.stringify(input, null, 2));
+
+    bot.sendMessage(chatId, '🎉 Merci ! Données enregistrées.');
   }
 });
+
