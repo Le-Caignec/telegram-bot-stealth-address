@@ -12,7 +12,11 @@ const ethProvider = utils.getSignerFromPrivateKey(
 );
 const iexec = new IExec({
   ethProvider,
-});
+},
+{
+  smsURL: 'https://sms.labs.iex.ec',
+}
+);
 
 // 3. Infos
 export async function handleSend(): Promise<{
@@ -48,9 +52,9 @@ export async function handleSend(): Promise<{
     workerpool: workerpoolorder.workerpool,
     params:{
       iexec_secrets:{
-        1:process.env.PRIVATEKEY_SENDER
-        2:process.env.AMOUNT
-        3:process.env.RPC
+        1:process.env.PRIVATEKEY_SENDER,
+        2:process.env.AMOUNT,
+        3:process.env.RPC,
         4:process.env.RECEIVER
       }
     }
