@@ -25,16 +25,15 @@ bot.onText(/\/send/, async (msg) => {
   bot.sendMessage(chatId, '🚀 Lancement de la tâche...');
 
   try {
-    // const { txHash, taskId, waitForCompletion } = await handleSend();
-     await handleSend();
+    const { txHash, taskId, waitForCompletion } = await handleSend();
 
-    // await bot.sendMessage(
-    //   chatId,
-    //   `✅ Deal créé !\n🧾 txHash: [${txHash}](https://explorer.iex.ec/bellecour/tx/${txHash})\n📦 taskId: [${taskId}](https://explorer.iex.ec/bellecour/task/${taskId})`,
-    //   { parse_mode: 'Markdown' }
-    // );
+    await bot.sendMessage(
+      chatId,
+      `✅ Deal créé !\n🧾 txHash: [${txHash}](https://explorer.iex.ec/bellecour/tx/${txHash})\n📦 taskId: [${taskId}](https://explorer.iex.ec/bellecour/task/${taskId})`,
+      { parse_mode: 'Markdown' }
+    );
 
-    // await waitForCompletion();
+    await waitForCompletion();
 
     await bot.sendMessage(chatId, `✅ La tâche est maintenant *terminée* !`, {
       parse_mode: 'Markdown',
