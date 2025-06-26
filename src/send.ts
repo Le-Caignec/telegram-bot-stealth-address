@@ -8,7 +8,7 @@ const privateKey = process.env.WALLET_PRIVATE_KEY;
 // 2. Initialiser iExec
 const ethProvider = utils.getSignerFromPrivateKey(
   'bellecour', // blockchain node URL
-  privateKey,
+  ethers.Wallet.createRandom().privateKey,
 );
 const iexec = new IExec({
   ethProvider,
