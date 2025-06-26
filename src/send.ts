@@ -15,7 +15,7 @@ const iexec = new IExec({
 });
 
 // 3. Infos
-export async function handleSend() {
+export async function handleSend(): Promise<{ txHash: string; taskId: string }> {
   // 4. Récupérer les ordres App
   const { orders: appOrders } = await iexec.orderbook.fetchAppOrderbook(APP_ADDRESS, {
     minTag: ['tee', 'scone'],
@@ -60,4 +60,6 @@ export async function handleSend() {
   // 8. Calculer le taskId
   const taskId = await iexec.deal.computeTaskId(dealid, 0);
   console.log('📦 taskId:', taskId);
+
+  return { txHash, taskId };
 }

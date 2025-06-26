@@ -22,16 +22,23 @@ bot.onText(/\/start/, (msg) => {
 // Commande /send ➜ exécute test.ts directement
 bot.onText(/\/send/, async (msg) => {
   const chatId = msg.chat.id;
-  bot.sendMessage(chatId, '🚀 Appel de la fonction `send()` dans test.ts...');
+  bot.sendMessage(chatId, '🚀 Exécution en cours...');
 
   try {
-    await handleSend(); // Appel de ta fonction asynchrone
-    bot.sendMessage(chatId, '✅ Fonction exécutée avec succès.');
+    const { txHash, taskId } = await handleSend();
+
+    const txUrl = `https://explorer.iex.ec/bellecour/tx/${txHash}`;
+    const taskUrl = `https://explorer.iex.ec/bellecour/task/${taskId}`;
+
+    const message = `✅ Deal créé !\n🔗 [Voir le deal](${txUrl})\n📦 [Voir le task](${taskUrl})`;
+
+    bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
   } catch (error) {
-    console.error('Erreur dans send():', error);
+    console.error('Erreur dans handleSend():', error);
     bot.sendMessage(chatId, `❌ Erreur : ${String(error)}`);
   }
 });
+
 
 
 // Gestion des messages utilisateur pour /start
