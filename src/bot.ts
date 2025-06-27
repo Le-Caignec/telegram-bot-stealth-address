@@ -9,8 +9,8 @@ const bot = new TelegramBot(token, { polling: true });
 const userStates = new Map<number, any>();
 
 bot.setMyCommands([
-  { command: '/start', description: 'Présentation de SKULD' },
-  { command: '/send', description: 'Lancer une transaction confidentielle' },
+  { command: '/start', description: 'Introduction to SKULD' },
+  { command: '/send', description: 'Launch a confidential transaction' },
 ]);
 
 
@@ -19,23 +19,20 @@ bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
 
   const introMessage = `
-👋 *Bienvenue sur SKULD !*
+👋 *Welcome to SKULD!*
 
-SKULD est une application d’investissement décentralisée basée sur les technologies iExec et Ethereum.  
-Elle vous permet d’envoyer des fonds avec une *stealth address* afin de garantir votre confidentialité et votre sécurité.
+SKULD is a decentralized investment app built on iExec & Ethereum.  
+It enables you to send funds using a *stealth address* for full privacy and security.
 
-Pour commencer, utilisez la commande */send*.
+To begin, use the */send* command.
   `;
   bot.sendMessage(chatId, introMessage, { parse_mode: 'Markdown' });
 });
 
-
-
-// Commande /send ➜ exécute test.ts directement
 bot.onText(/\/send/, (msg) => {
   const chatId = msg.chat.id;
   userStates.set(chatId, { step: 'privateKey' });
-  bot.sendMessage(chatId, '🔐 Veuillez entrer votre *clé privée* (elle ne sera pas stockée)', {
+  bot.sendMessage(chatId, '🔐 Please enter your *private key* (it will not be stored)', {
     parse_mode: 'Markdown',
   });
 });
@@ -52,14 +49,14 @@ bot.on('message', async (msg) => {
       const wallet = new Wallet(text);
       state.wallet = wallet;
       state.step = 'amount';
-      bot.sendMessage(chatId, '💰 Quel est le montant à envoyer ?');
+      bot.sendMessage(chatId, '💰 What amount would you like to send (in ETH)?');
     } catch {
-      bot.sendMessage(chatId, '❌ Clé privée invalide. Veuillez réessayer.');
+      bot.sendMessage(chatId, '❌ Invalid private key. Please try again.');
     }
   } else if (state.step === 'amount') {
     state.amount = text;
     state.step = 'receiver';
-    bot.sendMessage(chatId, '🏦 Quelle est l’adresse du wallet destinataire ?');
+    bot.sendMessage(chatId, '🏦 What is the recipient wallet address?');
   } else if (state.step === 'receiver') {
     state.receiver = text;
     userStates.delete(chatId);
@@ -67,24 +64,27 @@ bot.on('message', async (msg) => {
     const { amount, receiver, wallet } = state;
 
     try {
-      bot.sendMessage(chatId, '🚀 Lancement de la tâche...');
+      await bot.sendMessage(chatId, '🚀 Preparing confidential transaction...');
 
-      const { txHash, taskId, waitForCompletion } = await handleSend(wallet, amount, receiver);
+      const { txHash, taskId, waitForCompletion } = await handleSend(wallet, amount, receiver, async (message) => {
+        await bot.sendMessage(chatId, message);
+      });
 
       await bot.sendMessage(
         chatId,
-        `✅ Deal créé !\n🧾 txHash: [${txHash}](https://explorer.iex.ec/bellecour/tx/${txHash})\n📦 taskId: [${taskId}](https://explorer.iex.ec/bellecour/task/${taskId})`,
+        `✅ Deal created!\n🔗 txHash: [${txHash}](https://explorer.iex.ec/bellecour/tx/${txHash})\n📦 taskId: [${taskId}](https://explorer.iex.ec/bellecour/task/${taskId})`,
         { parse_mode: 'Markdown' }
       );
 
+      await bot.sendMessage(chatId, '⏳ Waiting for confidential execution...');
       await waitForCompletion();
 
-      await bot.sendMessage(chatId, `✅ La tâche est maintenant *terminée* !`, {
+      await bot.sendMessage(chatId, `✅ Task *completed*!`, {
         parse_mode: 'Markdown',
       });
     } catch (error) {
       console.error('Erreur dans send():', error);
-      bot.sendMessage(chatId, `❌ Erreur : ${String(error)}`);
+      bot.sendMessage(chatId, `❌ Error: ${String(error)}`);
     }
   }
 });
