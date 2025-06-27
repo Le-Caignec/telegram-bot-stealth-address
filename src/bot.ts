@@ -1,12 +1,11 @@
-import 'dotenv/config'
+import 'dotenv/config';
 import TelegramBot from 'node-telegram-bot-api';
 import { handleSend } from './send';
+import { Wallet } from 'ethers';
 
-// Ton token
 const token = process.env.BOT_TOKEN!;
 const bot = new TelegramBot(token, { polling: true });
 
-// Pour suivre l’état des users
 const userStates = new Map<number, any>();
 
 bot.setMyCommands([
@@ -27,7 +26,6 @@ Elle vous permet d’envoyer des fonds avec une *stealth address* afin de garant
 
 Pour commencer, utilisez la commande */send*.
   `;
-
   bot.sendMessage(chatId, introMessage, { parse_mode: 'Markdown' });
 });
 
@@ -36,32 +34,42 @@ Pour commencer, utilisez la commande */send*.
 // Commande /send ➜ exécute test.ts directement
 bot.onText(/\/send/, (msg) => {
   const chatId = msg.chat.id;
-  userStates.set(chatId, { step: 'amount' });
-  bot.sendMessage(chatId, '💰 Quel est le montant à envoyer ?');
+  userStates.set(chatId, { step: 'privateKey' });
+  bot.sendMessage(chatId, '🔐 Veuillez entrer votre *clé privée* (elle ne sera pas stockée)', {
+    parse_mode: 'Markdown',
+  });
 });
 
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
-  const text = msg.text?.trim();
+  const text = msg.text?.trim()!;
   const state = userStates.get(chatId);
 
-  // Ignore les commandes
   if (!state || text?.startsWith('/')) return;
 
-  if (state.step === 'amount') {
+  if (state.step === 'privateKey') {
+    try {
+      const wallet = new Wallet(text);
+      state.wallet = wallet;
+      state.step = 'amount';
+      bot.sendMessage(chatId, '💰 Quel est le montant à envoyer ?');
+    } catch {
+      bot.sendMessage(chatId, '❌ Clé privée invalide. Veuillez réessayer.');
+    }
+  } else if (state.step === 'amount') {
     state.amount = text;
     state.step = 'receiver';
     bot.sendMessage(chatId, '🏦 Quelle est l’adresse du wallet destinataire ?');
   } else if (state.step === 'receiver') {
     state.receiver = text;
-    userStates.delete(chatId); // Nettoyage
+    userStates.delete(chatId);
 
-    const { amount, receiver } = state;
+    const { amount, receiver, wallet } = state;
 
     try {
       bot.sendMessage(chatId, '🚀 Lancement de la tâche...');
 
-      const { txHash, taskId, waitForCompletion } = await handleSend(amount, receiver);
+      const { txHash, taskId, waitForCompletion } = await handleSend(wallet, amount, receiver);
 
       await bot.sendMessage(
         chatId,
@@ -80,4 +88,3 @@ bot.on('message', async (msg) => {
     }
   }
 });
- 

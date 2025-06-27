@@ -1,33 +1,39 @@
 import { IExec, utils } from 'iexec';
-import { ethers } from 'ethers';
-import {WORKERPOOL_ADDRESS,APP_ADDRESS,PROTECTED_DATA_ADDRESS} from './config/config'
-import {pushRequesterSecret} from './utils/utils';
+import { ethers, JsonRpcProvider, Wallet } from 'ethers';
+import { WORKERPOOL_ADDRESS, APP_ADDRESS, PROTECTED_DATA_ADDRESS, ESCROW_ADDRESS } from './config/config';
+import { pushRequesterSecret } from './utils/utils';
 
 // Initialiser iExec
 const ethProvider = utils.getSignerFromPrivateKey(
-  'bellecour', // blockchain node URL
-  ethers.Wallet.createRandom().privateKey,
+  'bellecour',
+  ethers.Wallet.createRandom().privateKey
 );
-const iexec = new IExec(
-  {
-    ethProvider,
-  },
-  {
-    smsURL: "https://sms.labs.iex.ec",
-  }
-);
+const iexec = new IExec({ ethProvider }, { smsURL: 'https://sms.labs.iex.ec' });
 
 // Infos
-export async function handleSend(amount: string, receiver: string) {
-  // Check if amount is a valid number
-  if (isNaN(Number(amount))) {
-    throw new Error('❌ Le montant doit être un nombre valide');
+export async function handleSend(senderWallet: Wallet, amount: string, receiver: string) {
+  if (isNaN(Number(amount))) throw new Error('❌ Le montant doit être un nombre valide');
+  if (!ethers.isAddress(receiver)) throw new Error('❌ L’adresse du destinataire n’est pas valide');
+
+  // Convertir le montant
+  const amountToSend = ethers.parseEther(amount);
+
+  // Appeler lockFunds sur le contrat Escrow
+  console.log('🔐 Envoi de lockFunds au contrat Escrow...');
+  const escrowAbi = ["function lockFunds() external payable"];
+   const provider = new JsonRpcProvider(process.env.RPC!); // ou URL directe
+  const connectedWallet = senderWallet.connect(provider);
+  const escrowContract = new ethers.Contract(ESCROW_ADDRESS, escrowAbi, connectedWallet);
+
+  const tx = await escrowContract.lockFunds({ value: amountToSend });
+  console.log(`✅ lockFunds envoyé ! Tx: ${tx.hash}`);
+  const receipt = await tx.wait();
+  if (receipt.status !== 1) {
+    throw new Error('❌ Échec du lockFunds');
   }
-  // Check if receiver is a valid address
-  if (!ethers.isAddress(receiver)) {
-    throw new Error('❌ L’adresse du destinataire n’est pas valide');
-  }
-  // Récupèrer les ordre des datasets
+  console.log('✅ lockFunds confirmé.');
+
+  // Ordres Dataset
   const { orders: datasetOrders } = await iexec.orderbook.fetchDatasetOrderbook(PROTECTED_DATA_ADDRESS, {
     app: APP_ADDRESS,
     workerpool: WORKERPOOL_ADDRESS,
@@ -36,9 +42,8 @@ export async function handleSend(amount: string, receiver: string) {
   });
   if (datasetOrders.length === 0) throw new Error('❌ Aucun DatasetOrder trouvé');
   const datasetorder = datasetOrders[0].order;
-  console.log("🚀 ~ handleSend ~ datasetorder:", datasetorder)
 
-  // Récupérer les ordres App
+  // Ordres App
   const { orders: appOrders } = await iexec.orderbook.fetchAppOrderbook(APP_ADDRESS, {
     minTag: ['tee', 'scone'],
     maxTag: ['tee', 'scone'],
@@ -47,9 +52,8 @@ export async function handleSend(amount: string, receiver: string) {
   });
   if (appOrders.length === 0) throw new Error('❌ Aucun AppOrder trouvé');
   const apporder = appOrders[0].order;
-  console.log("🚀 ~ handleSend ~ apporder:", apporder)
 
-  // Récupérer les ordres Workerpool
+  // Ordres Workerpool
   const { orders: wpOrders } = await iexec.orderbook.fetchWorkerpoolOrderbook({
     workerpool: WORKERPOOL_ADDRESS,
     app: APP_ADDRESS,
@@ -59,17 +63,16 @@ export async function handleSend(amount: string, receiver: string) {
   });
   if (wpOrders.length === 0) throw new Error('❌ Aucun WorkerpoolOrder trouvé');
   const workerpoolorder = wpOrders[0].order;
-  console.log("🚀 ~ handleSend ~ workerpoolorder:", workerpoolorder)
 
-  // Push RequesterSecret - FIXED
+  // Push secrets
   const requesterSecrets = [
     { key: '1', value: amount },
     { key: '2', value: process.env.RPC! },
     { key: '3', value: receiver },
+    { key: '4', value: senderWallet.address },
   ];
-
-  let iexec_secrets;
-  iexec_secrets = Object.fromEntries(
+  
+  const iexec_secrets = Object.fromEntries(
     await Promise.all(
       requesterSecrets.map(async ({ key, value }) => {
         const name = await pushRequesterSecret({ iexec, value });
@@ -78,21 +81,18 @@ export async function handleSend(amount: string, receiver: string) {
     )
   );
 
-  // Créer un RequestOrder
+  // RequestOrder
   const requestorderToSign = await iexec.order.createRequestorder({
     dataset: datasetorder.dataset,
     app: apporder.app,
     category: workerpoolorder.category,
     tag: ['tee', 'scone'],
     workerpool: workerpoolorder.workerpool,
-    params:{
-      iexec_secrets
-    }
+    params: { iexec_secrets },
   });
   const requestorder = await iexec.order.signRequestorder(requestorderToSign);
-  console.log("🚀 ~ handleSend ~ order:", requestorder)
 
-  // Matcher les ordres
+  // Match orders
   const { dealid, txHash } = await iexec.order.matchOrders({
     datasetorder,
     apporder,
@@ -101,11 +101,11 @@ export async function handleSend(amount: string, receiver: string) {
   });
   console.log('✅ Deal créé ! txHash:', txHash);
 
-  // Calculer le taskId
+  // Task
   const taskId = await iexec.deal.computeTaskId(dealid, 0);
   console.log('📦 taskId:', taskId);
 
-  // Fonction à appeler plus tard pour attendre la complétion
+  // Wait
   const waitForCompletion = async () => {
     const taskObservable = await iexec.task.obsTask(taskId, { dealid });
     await new Promise((resolve, reject) => {
