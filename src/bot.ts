@@ -9,6 +9,12 @@ const bot = new TelegramBot(token, { polling: true });
 // Pour suivre l’état des users
 const userStates = new Map<number, any>();
 
+bot.setMyCommands([
+  { command: '/start', description: 'Présentation de SKULD' },
+  { command: '/send', description: 'Lancer une transaction confidentielle' },
+]);
+
+
 // Commande /start ➜ questionnaire
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
